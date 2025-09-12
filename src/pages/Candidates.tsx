@@ -1,0 +1,521 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { 
+  Users, 
+  Search, 
+  Filter, 
+  Plus, 
+  Eye, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Calendar,
+  GraduationCap,
+  Briefcase,
+  Star,
+  MoreVertical,
+  Edit,
+  Trash2,
+  MessageSquare,
+  FileText,
+  ChevronRight
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { CandidateDetailModal } from '@/components/candidates/CandidateDetailModal';
+import { AddCandidateDialog } from '@/components/candidates/AddCandidateDialog'; // Candidate dialog component
+
+// Mock candidate data
+interface Candidate {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  position: string;
+  stage: 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
+  experience: number;
+  education: string;
+  skills: string[];
+  avatar?: string;
+  appliedDate: string;
+  lastActivity: string;
+  rating: number;
+  notes: string[];
+  resume?: string;
+  linkedin?: string;
+  portfolio?: string;
+}
+
+const mockCandidates: Candidate[] = Array.from({ length: 1000 }, (_, i) => ({
+  id: `candidate-${i + 1}`,
+  name: `Candidate ${i + 1}`,
+  email: `candidate${i + 1}@email.com`,
+  phone: `+1 (555) ${String(Math.floor(Math.random() * 9000) + 1000)}`,
+  location: ['San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'Boston, MA'][Math.floor(Math.random() * 5)],
+  position: ['Frontend Developer', 'Backend Developer', 'Full Stack Developer', 'Product Manager', 'UX Designer', 'Data Scientist'][Math.floor(Math.random() * 6)],
+  stage: ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'][Math.floor(Math.random() * 6)] as any,
+  experience: Math.floor(Math.random() * 10) + 1,
+  education: ['Bachelor\'s Degree', 'Master\'s Degree', 'PhD', 'Bootcamp Graduate'][Math.floor(Math.random() * 4)],
+  skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS', 'Docker', 'Kubernetes'].slice(0, Math.floor(Math.random() * 4) + 2),
+  appliedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+  lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+  rating: Math.floor(Math.random() * 5) + 1,
+  notes: [`Note ${i + 1}`, `Additional note ${i + 1}`],
+}));
+
+const CandidateCard: React.FC<{ 
+  candidate: Candidate; 
+  onView: (candidate: Candidate) => void;
+  onEdit: (candidate: Candidate) => void;
+  onDelete: (candidate: Candidate) => void;
+  onMoveStage: (candidate: Candidate, newStage: Candidate['stage']) => void;
+}> = ({ candidate, onView, onEdit, onDelete, onMoveStage }) => {
+  const getStageColor = (stage: Candidate['stage']) => {
+    switch (stage) {
+      case 'applied': return 'bg-blue-100 text-blue-800';
+      case 'screening': return 'bg-yellow-100 text-yellow-800';
+      case 'interview': return 'bg-purple-100 text-purple-800';
+      case 'offer': return 'bg-green-100 text-green-800';
+      case 'hired': return 'bg-emerald-100 text-emerald-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="w-12 h-12">
+            <AvatarImage src={candidate.avatar} />
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {candidate.name.split(' ').map(n => n[0]).join('')}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-foreground truncate">{candidate.name}</h3>
+                <p className="text-sm text-muted-foreground truncate">{candidate.position}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className={getStageColor(candidate.stage)}>
+                    {candidate.stage}
+                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star 
+                        key={i} 
+                        className={`w-3 h-3 ${i < candidate.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onView(candidate)}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(candidate)}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDelete(candidate)} className="text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+              <div className="flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {candidate.location}
+              </div>
+              <div className="flex items-center gap-1">
+                <Briefcase className="w-3 h-3" />
+                {candidate.experience}y exp
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-1 mt-2">
+              {candidate.skills.slice(0, 3).map((skill) => (
+                <Badge key={skill} variant="secondary" className="text-xs">
+                  {skill}
+                </Badge>
+              ))}
+              {candidate.skills.length > 3 && (
+                <Badge variant="outline" className="text-xs">
+                  +{candidate.skills.length - 3}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const KanbanColumn: React.FC<{
+  title: string;
+  stage: Candidate['stage'];
+  candidates: Candidate[];
+  onMoveStage: (candidate: Candidate, newStage: Candidate['stage']) => void;
+  onView: (candidate: Candidate) => void;
+  onEdit: (candidate: Candidate) => void;
+  onDelete: (candidate: Candidate) => void;
+}> = ({ title, stage, candidates, onMoveStage, onView, onEdit, onDelete }) => {
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const candidateId = e.dataTransfer.getData('candidateId');
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (candidate) {
+      onMoveStage(candidate, stage);
+    }
+  };
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        <Badge variant="secondary">{candidates.length}</Badge>
+      </div>
+      
+      <ScrollArea className="h-[600px]">
+        <div 
+          className="space-y-3 p-2"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          {candidates.map((candidate) => (
+            <div
+              key={candidate.id}
+              draggable
+              onDragStart={(e) => e.dataTransfer.setData('candidateId', candidate.id)}
+              className="cursor-move"
+            >
+              <CandidateCard
+                candidate={candidate}
+                onView={onView}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMoveStage={onMoveStage}
+              />
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
+export const Candidates: React.FC = () => {
+  const navigate = useNavigate();
+  const { candidateId } = useParams();
+  
+  const [candidates, setCandidates] = useState<Candidate[]>(mockCandidates);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stageFilter, setStageFilter] = useState<'all' | Candidate['stage']>('all');
+  const [positionFilter, setPositionFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
+
+  // Get unique positions for filter
+  const allPositions = useMemo(() => {
+    const positions = new Set<string>();
+    candidates.forEach(candidate => positions.add(candidate.position));
+    return Array.from(positions);
+  }, [candidates]);
+
+  // Filter candidates
+  const filteredCandidates = useMemo(() => {
+    return candidates.filter((candidate) => {
+      const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           candidate.position.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStage = stageFilter === 'all' || candidate.stage === stageFilter;
+      const matchesPosition = positionFilter === 'all' || candidate.position === positionFilter;
+      return matchesSearch && matchesStage && matchesPosition;
+    });
+  }, [candidates, searchQuery, stageFilter, positionFilter]);
+
+  // Group candidates by stage for kanban view
+  const candidatesByStage = useMemo(() => {
+    const groups = {
+      applied: [] as Candidate[],
+      screening: [] as Candidate[],
+      interview: [] as Candidate[],
+      offer: [] as Candidate[],
+      hired: [] as Candidate[],
+      rejected: [] as Candidate[],
+    };
+    
+    filteredCandidates.forEach(candidate => {
+      groups[candidate.stage].push(candidate);
+    });
+    
+    return groups;
+  }, [filteredCandidates]);
+
+  // Handle candidate actions
+  const handleViewCandidate = (candidate: Candidate) => {
+    setSelectedCandidate(candidate);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleEditCandidate = (candidate: Candidate) => {
+    setEditingCandidate(candidate);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleDeleteCandidate = (candidate: Candidate) => {
+    if (window.confirm(`Are you sure you want to delete ${candidate.name}?`)) {
+      setCandidates(prev => prev.filter(c => c.id !== candidate.id));
+    }
+  };
+
+  const handleMoveStage = (candidate: Candidate, newStage: Candidate['stage']) => {
+    setCandidates(prev => prev.map(c => 
+      c.id === candidate.id ? { ...c, stage: newStage } : c
+    ));
+  };
+
+  // Handle deep linking
+  React.useEffect(() => {
+    if (candidateId) {
+      const candidate = candidates.find(c => c.id === candidateId);
+      if (candidate) {
+        setSelectedCandidate(candidate);
+        setIsDetailModalOpen(true);
+      }
+    }
+  }, [candidateId, candidates]);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Candidates</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage candidates and track their progress through the hiring pipeline
+          </p>
+        </div>
+        <Button 
+          className="gradient-primary text-white shadow-md hover:shadow-lg transition-all"
+          onClick={() => setIsAddDialogOpen(true)}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Candidate
+        </Button>
+      </div>
+
+      {/* Filters and Search */}
+      <Card className="p-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search candidates by name, email, or position..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Select value={stageFilter} onValueChange={(value: any) => setStageFilter(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Stage" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                <SelectItem value="applied">Applied</SelectItem>
+                <SelectItem value="screening">Screening</SelectItem>
+                <SelectItem value="interview">Interview</SelectItem>
+                <SelectItem value="offer">Offer</SelectItem>
+                <SelectItem value="hired">Hired</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={positionFilter} onValueChange={setPositionFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Position" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Positions</SelectItem>
+                {allPositions.map(position => (
+                  <SelectItem key={position} value={position}>{position}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        {Object.entries(candidatesByStage).map(([stage, candidates]) => (
+          <Card key={stage} className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-foreground">{candidates.length}</div>
+              <div className="text-sm text-muted-foreground capitalize">{stage}</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* View Toggle */}
+      <div className="flex items-center justify-between">
+        <Tabs value={viewMode} onValueChange={(value: any) => setViewMode(value)}>
+          <TabsList>
+            <TabsTrigger value="kanban">Kanban Board</TabsTrigger>
+            <TabsTrigger value="list">List View</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="text-sm text-muted-foreground">
+          {filteredCandidates.length} candidates found
+        </div>
+      </div>
+
+      {/* Content */}
+      <TabsContent value={viewMode}>
+        {viewMode === 'kanban' ? (
+          <div className="flex gap-6 overflow-x-auto">
+            <KanbanColumn
+              title="Applied"
+              stage="applied"
+              candidates={candidatesByStage.applied}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+            <KanbanColumn
+              title="Screening"
+              stage="screening"
+              candidates={candidatesByStage.screening}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+            <KanbanColumn
+              title="Interview"
+              stage="interview"
+              candidates={candidatesByStage.interview}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+            <KanbanColumn
+              title="Offer"
+              stage="offer"
+              candidates={candidatesByStage.offer}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+            <KanbanColumn
+              title="Hired"
+              stage="hired"
+              candidates={candidatesByStage.hired}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+            <KanbanColumn
+              title="Rejected"
+              stage="rejected"
+              candidates={candidatesByStage.rejected}
+              onMoveStage={handleMoveStage}
+              onView={handleViewCandidate}
+              onEdit={handleEditCandidate}
+              onDelete={handleDeleteCandidate}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCandidates.map((candidate) => (
+              <CandidateCard
+                key={candidate.id}
+                candidate={candidate}
+                onView={handleViewCandidate}
+                onEdit={handleEditCandidate}
+                onDelete={handleDeleteCandidate}
+                onMoveStage={handleMoveStage}
+              />
+            ))}
+          </div>
+        )}
+      </TabsContent>
+
+      {/* Empty State */}
+      {filteredCandidates.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <Users className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">No candidates found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchQuery ? 'Try adjusting your search criteria' : 'Start by adding your first candidate'}
+          </p>
+          {!searchQuery && (
+            <Button 
+              className="gradient-primary text-white"
+              onClick={() => setIsAddDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Candidate
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      <CandidateDetailModal
+        open={isDetailModalOpen}
+        onOpenChange={setIsDetailModalOpen}
+        candidate={selectedCandidate}
+      />
+      
+      <AddCandidateDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        editingCandidate={editingCandidate}
+        onEditComplete={() => setEditingCandidate(null)}
+      />
+    </div>
+  );
+};

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Users, 
@@ -18,7 +18,9 @@ import {
   Trash2,
   MessageSquare,
   FileText,
-  ChevronRight
+  ChevronRight,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,46 +33,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CandidateDetailModal } from '@/components/candidates/CandidateDetailModal';
-import { AddCandidateDialog } from '@/components/candidates/AddCandidateDialog'; // Candidate dialog component
-
-// Mock candidate data
-interface Candidate {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  location: string;
-  position: string;
-  stage: 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
-  experience: number;
-  education: string;
-  skills: string[];
-  avatar?: string;
-  appliedDate: string;
-  lastActivity: string;
-  rating: number;
-  notes: string[];
-  resume?: string;
-  linkedin?: string;
-  portfolio?: string;
-}
-
-const mockCandidates: Candidate[] = Array.from({ length: 1000 }, (_, i) => ({
-  id: `candidate-${i + 1}`,
-  name: `Candidate ${i + 1}`,
-  email: `candidate${i + 1}@email.com`,
-  phone: `+1 (555) ${String(Math.floor(Math.random() * 9000) + 1000)}`,
-  location: ['San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'Boston, MA'][Math.floor(Math.random() * 5)],
-  position: ['Frontend Developer', 'Backend Developer', 'Full Stack Developer', 'Product Manager', 'UX Designer', 'Data Scientist'][Math.floor(Math.random() * 6)],
-  stage: ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'][Math.floor(Math.random() * 6)] as any,
-  experience: Math.floor(Math.random() * 10) + 1,
-  education: ['Bachelor\'s Degree', 'Master\'s Degree', 'PhD', 'Bootcamp Graduate'][Math.floor(Math.random() * 4)],
-  skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS', 'Docker', 'Kubernetes'].slice(0, Math.floor(Math.random() * 4) + 2),
-  appliedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-  lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-  rating: Math.floor(Math.random() * 5) + 1,
-  notes: [`Note ${i + 1}`, `Additional note ${i + 1}`],
-}));
+import { AddCandidateDialog } from '@/components/candidates/AddCandidateDialog';
+import { VirtualizedCandidateList } from '@/components/candidates/VirtualizedCandidateList';
+import { KanbanBoard } from '@/components/candidates/KanbanBoard';
+import { CandidateProfile } from '@/components/candidates/CandidateProfile';
+import { useCandidateStore, Candidate } from '@/store/useCandidateStore';
+import { useCandidateSeedData } from '@/hooks/useCandidateSeedData';
 
 const CandidateCard: React.FC<{ 
   candidate: Candidate; 
@@ -236,31 +204,50 @@ export const Candidates: React.FC = () => {
   const navigate = useNavigate();
   const { candidateId } = useParams();
   
-  const [candidates, setCandidates] = useState<Candidate[]>(mockCandidates);
+  const { 
+    moveCandidateStage, 
+    deleteCandidate, 
+    updateCandidate 
+  } = useCandidateStore();
+  
+  // Initialize seed data
+  const { candidates } = useCandidateSeedData();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<'all' | Candidate['stage']>('all');
   const [positionFilter, setPositionFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'virtualized'>('kanban');
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
 
+  // If we're on a candidate profile page, show the profile component
+  if (candidateId && candidateId.startsWith('candidate-')) {
+    return <CandidateProfile />;
+  }
+
   // Get unique positions for filter
   const allPositions = useMemo(() => {
     const positions = new Set<string>();
     candidates.forEach(candidate => positions.add(candidate.position));
-    return Array.from(positions);
+    return Array.from(positions).sort();
   }, [candidates]);
 
-  // Filter candidates
+  // Enhanced filter candidates with better search
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
-      const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           candidate.position.toLowerCase().includes(searchQuery.toLowerCase());
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        candidate.name.toLowerCase().includes(searchLower) ||
+        candidate.email.toLowerCase().includes(searchLower) ||
+        candidate.position.toLowerCase().includes(searchLower) ||
+        candidate.location.toLowerCase().includes(searchLower) ||
+        candidate.skills.some(skill => skill.toLowerCase().includes(searchLower));
+      
       const matchesStage = stageFilter === 'all' || candidate.stage === stageFilter;
       const matchesPosition = positionFilter === 'all' || candidate.position === positionFilter;
+      
       return matchesSearch && matchesStage && matchesPosition;
     });
   }, [candidates, searchQuery, stageFilter, positionFilter]);
@@ -285,8 +272,7 @@ export const Candidates: React.FC = () => {
 
   // Handle candidate actions
   const handleViewCandidate = (candidate: Candidate) => {
-    setSelectedCandidate(candidate);
-    setIsDetailModalOpen(true);
+    navigate(`/dashboard/candidates/${candidate.id}`);
   };
 
   const handleEditCandidate = (candidate: Candidate) => {
@@ -296,26 +282,13 @@ export const Candidates: React.FC = () => {
 
   const handleDeleteCandidate = (candidate: Candidate) => {
     if (window.confirm(`Are you sure you want to delete ${candidate.name}?`)) {
-      setCandidates(prev => prev.filter(c => c.id !== candidate.id));
+      deleteCandidate(candidate.id);
     }
   };
 
   const handleMoveStage = (candidate: Candidate, newStage: Candidate['stage']) => {
-    setCandidates(prev => prev.map(c => 
-      c.id === candidate.id ? { ...c, stage: newStage } : c
-    ));
+    moveCandidateStage(candidate.id, newStage, `Moved from ${candidate.stage} to ${newStage}`);
   };
-
-  // Handle deep linking
-  React.useEffect(() => {
-    if (candidateId) {
-      const candidate = candidates.find(c => c.id === candidateId);
-      if (candidate) {
-        setSelectedCandidate(candidate);
-        setIsDetailModalOpen(true);
-      }
-    }
-  }, [candidateId, candidates]);
 
   return (
     <div className="space-y-6">
@@ -396,76 +369,49 @@ export const Candidates: React.FC = () => {
       <div className="flex items-center justify-between">
         <Tabs value={viewMode} onValueChange={(value: any) => setViewMode(value)}>
           <TabsList>
-            <TabsTrigger value="kanban">Kanban Board</TabsTrigger>
-            <TabsTrigger value="list">List View</TabsTrigger>
+            <TabsTrigger value="kanban">
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Kanban Board
+            </TabsTrigger>
+            <TabsTrigger value="virtualized">
+              <List className="w-4 h-4 mr-2" />
+              List View
+            </TabsTrigger>
+            <TabsTrigger value="list">
+              <Users className="w-4 h-4 mr-2" />
+              Grid View
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         
         <div className="text-sm text-muted-foreground">
-          {filteredCandidates.length} candidates found
+          {filteredCandidates.length} of {candidates.length} candidates found
         </div>
       </div>
 
       {/* Content */}
-      <TabsContent value={viewMode}>
-        {viewMode === 'kanban' ? (
-          <div className="flex gap-6 overflow-x-auto">
-            <KanbanColumn
-              title="Applied"
-              stage="applied"
-              candidates={candidatesByStage.applied}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-            <KanbanColumn
-              title="Screening"
-              stage="screening"
-              candidates={candidatesByStage.screening}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-            <KanbanColumn
-              title="Interview"
-              stage="interview"
-              candidates={candidatesByStage.interview}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-            <KanbanColumn
-              title="Offer"
-              stage="offer"
-              candidates={candidatesByStage.offer}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-            <KanbanColumn
-              title="Hired"
-              stage="hired"
-              candidates={candidatesByStage.hired}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-            <KanbanColumn
-              title="Rejected"
-              stage="rejected"
-              candidates={candidatesByStage.rejected}
-              onMoveStage={handleMoveStage}
-              onView={handleViewCandidate}
-              onEdit={handleEditCandidate}
-              onDelete={handleDeleteCandidate}
-            />
-          </div>
-        ) : (
+      <div className="mt-6">
+        {viewMode === 'kanban' && (
+          <KanbanBoard
+            candidates={filteredCandidates}
+            onMoveStage={handleMoveStage}
+            onView={handleViewCandidate}
+            onEdit={handleEditCandidate}
+            onDelete={handleDeleteCandidate}
+          />
+        )}
+        
+        {viewMode === 'virtualized' && (
+          <VirtualizedCandidateList
+            candidates={filteredCandidates}
+            onView={handleViewCandidate}
+            onEdit={handleEditCandidate}
+            onDelete={handleDeleteCandidate}
+            height={600}
+          />
+        )}
+        
+        {viewMode === 'list' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCandidates.map((candidate) => (
               <CandidateCard
@@ -479,7 +425,7 @@ export const Candidates: React.FC = () => {
             ))}
           </div>
         )}
-      </TabsContent>
+      </div>
 
       {/* Empty State */}
       {filteredCandidates.length === 0 && (

@@ -56,9 +56,9 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ candidate, onView, onEdit, onDe
         e.dataTransfer.setData('candidateData', JSON.stringify(candidate));
       }}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start gap-3">
-          <Avatar className="w-10 h-10 flex-shrink-0">
+      <CardContent className="p-2 sm:p-3">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
             <AvatarImage src={candidate.avatar} />
             <AvatarFallback className="bg-primary text-primary-foreground text-xs">
               {candidate.name.split(' ').map(n => n[0]).join('')}
@@ -66,9 +66,9 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ candidate, onView, onEdit, onDe
           </Avatar>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-2">
+            <div className="flex items-start justify-between mb-1 sm:mb-2">
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-foreground truncate text-sm">{candidate.name}</h4>
+                <h4 className="font-medium text-foreground truncate text-xs sm:text-sm">{candidate.name}</h4>
                 <p className="text-xs text-muted-foreground truncate">{candidate.position}</p>
               </div>
               
@@ -77,7 +77,7 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ candidate, onView, onEdit, onDe
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreVertical className="w-3 h-3" />
@@ -100,36 +100,36 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ candidate, onView, onEdit, onDe
               </DropdownMenu>
             </div>
             
-            <div className="flex items-center gap-1 mb-2">
+            <div className="flex items-center gap-1 mb-1 sm:mb-2">
               <div className="flex items-center gap-1">
                 {[...Array(5)].map((_, i) => (
                   <Star 
                     key={i} 
-                    className={`w-2.5 h-2.5 ${i < candidate.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
+                    className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${i < candidate.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
                   />
                 ))}
               </div>
             </div>
             
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+            <div className="flex items-center gap-1 sm:gap-2 text-xs text-muted-foreground mb-1 sm:mb-2">
               <div className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate max-w-20">{candidate.location.split(',')[0]}</span>
+                <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span className="truncate max-w-16 sm:max-w-20">{candidate.location.split(',')[0]}</span>
               </div>
               <div className="flex items-center gap-1">
-                <Briefcase className="w-3 h-3" />
+                <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                 {candidate.experience}y
               </div>
             </div>
             
             <div className="flex flex-wrap gap-1">
               {candidate.skills.slice(0, 2).map((skill) => (
-                <Badge key={skill} variant="secondary" className="text-xs px-1.5 py-0.5">
+                <Badge key={skill} variant="secondary" className="text-xs px-1 py-0.5 sm:px-1.5">
                   {skill}
                 </Badge>
               ))}
               {candidate.skills.length > 2 && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                <Badge variant="outline" className="text-xs px-1 py-0.5 sm:px-1.5">
                   +{candidate.skills.length - 2}
                 </Badge>
               )}
@@ -177,22 +177,22 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   };
 
   return (
-    <div className="flex-1 min-w-0 max-w-80">
+    <div className="w-full sm:w-auto sm:flex-1 sm:min-w-0 sm:max-w-80">
       <div 
-        className={`rounded-lg border-2 border-dashed ${getColumnColor(stage)} min-h-[600px]`}
+        className={`rounded-lg border-2 border-dashed ${getColumnColor(stage)} min-h-[400px] sm:min-h-[600px]`}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">{title}</h3>
+        <div className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="font-semibold text-foreground text-sm sm:text-base">{title}</h3>
             <Badge variant="secondary" className="text-xs">
               {candidates.length}
             </Badge>
           </div>
           
-          <ScrollArea className="h-[520px]">
-            <div className="space-y-3 pr-2">
+          <ScrollArea className="h-[350px] sm:h-[520px]">
+            <div className="space-y-2 sm:space-y-3 pr-1 sm:pr-2">
               {candidates.map((candidate) => (
                 <KanbanCard
                   key={candidate.id}
@@ -204,11 +204,11 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
               ))}
               
               {candidates.length === 0 && (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-2">
-                    <Plus className="w-6 h-6 text-muted-foreground" />
+                <div className="text-center py-6 sm:py-8">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Drop candidates here
                   </p>
                 </div>
@@ -263,20 +263,42 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     { title: 'Rejected', stage: 'rejected' as const, candidates: candidatesByStage.rejected },
   ];
 
+  const firstRow = columns.slice(0, 3);
+  const secondRow = columns.slice(3);
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {columns.map((column) => (
-        <KanbanColumn
-          key={column.stage}
-          title={column.title}
-          stage={column.stage}
-          candidates={column.candidates}
-          onMoveStage={onMoveStage}
-          onView={onView}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
+    <div className="w-full space-y-4">
+      {/* Row 1: Applied, Screening, Interview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {firstRow.map((column) => (
+          <KanbanColumn
+            key={column.stage}
+            title={column.title}
+            stage={column.stage}
+            candidates={column.candidates}
+            onMoveStage={onMoveStage}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+
+      {/* Row 2: Offer, Hired, Rejected */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {secondRow.map((column) => (
+          <KanbanColumn
+            key={column.stage}
+            title={column.title}
+            stage={column.stage}
+            candidates={column.candidates}
+            onMoveStage={onMoveStage}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
     </div>
   );
 };

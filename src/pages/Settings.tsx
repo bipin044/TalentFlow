@@ -1,35 +1,29 @@
-import React from 'react';
-import { Settings as SettingsIcon, User, Bell, Shield, Palette } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Settings as SettingsIcon, User, Bell, Palette } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { useSettingsStore, applyThemePreference } from '@/store/useSettingsStore';
+import { toast } from '@/components/ui/sonner';
 
 export const Settings: React.FC = () => {
-  const settingsCategories = [
-    {
-      title: 'Profile Settings',
-      description: 'Manage your account information and preferences',
-      icon: User,
-      color: 'bg-primary',
-    },
-    {
-      title: 'Notifications',
-      description: 'Configure email and push notification preferences',
-      icon: Bell,
-      color: 'bg-warning',
-    },
-    {
-      title: 'Security',
-      description: 'Password, two-factor authentication, and security settings',
-      icon: Shield,
-      color: 'bg-success',
-    },
-    {
-      title: 'Appearance',
-      description: 'Theme, layout, and display preferences',
-      icon: Palette,
-      color: 'bg-secondary',
-    },
-  ];
+  const {
+    profile,
+    notifications,
+    appearance,
+    updateProfile,
+    updateNotifications,
+    updateAppearance,
+  } = useSettingsStore();
+
+  useEffect(() => {
+    applyThemePreference(appearance.theme);
+  }, [appearance.theme]);
+  // Settings panels are rendered directly below
 
   return (
     <div className="space-y-6">
@@ -43,46 +37,127 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Settings Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {settingsCategories.map((category, index) => (
-          <Card 
-            key={index}
-            className="card-elevated hover:shadow-lg transition-all duration-300 cursor-pointer group"
-          >
-            <CardHeader>
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 ${category.color} rounded-lg flex items-center justify-center`}>
-                  <category.icon className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {category.title}
-                  </CardTitle>
-                </div>
+      {/* Working Settings Panels (Security removed) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Profile */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <p className="text-sm text-muted-foreground mb-4">
-                {category.description}
-              </p>
-              <Button variant="outline" size="sm">
-                Configure
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              <div>
+                <CardTitle>Profile Settings</CardTitle>
+                <p className="text-sm text-muted-foreground">Manage your account information</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="name">Username</Label>
+              <Input 
+                id="name" 
+                value={profile.name} 
+                onChange={(e) => updateProfile({ name: e.target.value })}
+                placeholder="Enter your username"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => toast.success('Username updated')}>Save Changes</Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Coming Soon */}
-      <div className="text-center py-20">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-          <SettingsIcon className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium text-foreground mb-2">Settings Configuration</h3>
-        <p className="text-muted-foreground mb-4">
-          Detailed settings panels and configuration options coming soon
-        </p>
+        {/* Notifications */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
+                <Bell className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle>Notifications</CardTitle>
+                <p className="text-sm text-muted-foreground">Email and push preferences</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Email notifications</p>
+                <p className="text-sm text-muted-foreground">Receive updates via email</p>
+              </div>
+              <Switch checked={notifications.emailNotifications} onCheckedChange={(v) => updateNotifications({ emailNotifications: v })} />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Push notifications</p>
+                <p className="text-sm text-muted-foreground">Enable in-browser push alerts</p>
+              </div>
+              <Switch checked={notifications.pushNotifications} onCheckedChange={(v) => updateNotifications({ pushNotifications: v })} />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Weekly summary</p>
+                <p className="text-sm text-muted-foreground">Get a weekly activity report</p>
+              </div>
+              <Switch checked={notifications.weeklySummary} onCheckedChange={(v) => updateNotifications({ weeklySummary: v })} />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => toast.success('Notification preferences saved')}>Save Preferences</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
+                <Palette className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle>Appearance</CardTitle>
+                <p className="text-sm text-muted-foreground">Theme and density</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Theme</Label>
+                <Select value={appearance.theme} onValueChange={(v) => updateAppearance({ theme: v as any })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select theme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Density</Label>
+                <Select value={appearance.density} onValueChange={(v) => updateAppearance({ density: v as any })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select density" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="comfortable">Comfortable</SelectItem>
+                    <SelectItem value="compact">Compact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => { applyThemePreference(appearance.theme); toast.success('Appearance updated'); }}>Apply</Button>
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );

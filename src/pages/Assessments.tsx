@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   ClipboardList, 
   Search, 
@@ -28,11 +28,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { AssessmentBuilder } from '@/components/assessments/AssessmentBuilder';
+import { AssessmentPreview } from '@/components/assessments/AssessmentPreview';
 import { CreateAssessmentDialog } from '@/components/assessments/CreateAssessmentDialog';
 
 export const Assessments: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentId } = useParams();
+  const location = useLocation();
   const { 
     assessments, 
     currentAssessment, 
@@ -41,7 +43,8 @@ export const Assessments: React.FC = () => {
     duplicateAssessment,
     publishAssessment,
     unpublishAssessment,
-    getResponsesForAssessment
+    getResponsesForAssessment,
+    saveResponse
   } = useAssessmentStore();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,7 +67,9 @@ export const Assessments: React.FC = () => {
   };
 
   const handleEditAssessment = (assessment: any) => {
-    setCurrentAssessment(assessment);
+    const fromStore = assessments.find(a => a.id === assessment.id) || assessment;
+    setCurrentAssessment({ ...fromStore });
+    navigate(`/dashboard/assessments/${fromStore.id}/edit`);
   };
 
   const handleDeleteAssessment = (assessmentId: string) => {
@@ -100,6 +105,49 @@ export const Assessments: React.FC = () => {
   const getResponseCount = (assessmentId: string) => {
     return getResponsesForAssessment(assessmentId).length;
   };
+
+  // Deep link: /dashboard/assessments/:assessmentId/preview -> show live preview
+  if (assessmentId && location.pathname.includes('/preview')) {
+    const assessment = assessments.find(a => a.id === assessmentId);
+    if (!assessment) {
+      return (
+        <div className="p-6">
+          <Button variant="outline" onClick={() => navigate('/dashboard/assessments')}>Back</Button>
+          <div className="mt-6 text-muted-foreground">Assessment not found.</div>
+        </div>
+      );
+    }
+
+    const existing = getResponsesForAssessment(assessmentId)[0];
+
+    return (
+      <div className="h-full flex flex-col">
+        <div className="p-3 border-b flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/assessments')}>
+            Back to Assessments
+          </Button>
+          <div className="text-sm text-muted-foreground">Live Preview</div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <AssessmentPreview
+            assessment={assessment}
+            initialResponse={existing}
+            onResponseChange={(resp) => saveResponse(resp)}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Deep link: /dashboard/assessments/:assessmentId/edit -> open builder
+  React.useEffect(() => {
+    if (assessmentId && location.pathname.includes('/edit')) {
+      const a = assessments.find(x => x.id === assessmentId);
+      if (a) {
+        setCurrentAssessment(a);
+      }
+    }
+  }, [assessmentId, location.pathname, assessments, setCurrentAssessment]);
 
   // If we're in builder mode, show the builder with a back button
   if (currentAssessment) {

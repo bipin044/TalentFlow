@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/dialog';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { Assessment } from '@/types/assessment';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useJobStore } from '@/store/useJobStore';
 
 interface CreateAssessmentDialogProps {
   open: boolean;
@@ -26,8 +28,10 @@ export const CreateAssessmentDialog: React.FC<CreateAssessmentDialogProps> = ({
   onAssessmentCreated,
 }) => {
   const { createAssessment } = useAssessmentStore();
+  const { jobs } = useJobStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [jobId, setJobId] = useState<string | undefined>(undefined);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
@@ -38,6 +42,7 @@ export const CreateAssessmentDialog: React.FC<CreateAssessmentDialogProps> = ({
       const newAssessment = {
         title: title.trim(),
         description: description.trim(),
+        jobId,
         sections: [],
         isPublished: false,
       };
@@ -53,6 +58,7 @@ export const CreateAssessmentDialog: React.FC<CreateAssessmentDialogProps> = ({
       // Reset form
       setTitle('');
       setDescription('');
+      setJobId(undefined);
     } catch (error) {
       console.error('Error creating assessment:', error);
     } finally {
@@ -64,6 +70,7 @@ export const CreateAssessmentDialog: React.FC<CreateAssessmentDialogProps> = ({
     if (!isCreating) {
       setTitle('');
       setDescription('');
+      setJobId(undefined);
       onOpenChange(false);
     }
   };
@@ -88,6 +95,19 @@ export const CreateAssessmentDialog: React.FC<CreateAssessmentDialogProps> = ({
               placeholder="Enter assessment title..."
               disabled={isCreating}
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>Attach to Job (Optional)</Label>
+            <Select value={jobId} onValueChange={setJobId as any}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a job (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="description">Description (Optional)</Label>

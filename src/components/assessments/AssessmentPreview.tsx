@@ -176,7 +176,7 @@ export const AssessmentPreview: React.FC<AssessmentPreviewProps> = ({
       <Separator />
 
       {/* Assessment Sections */}
-      <div className="space-y-8">
+      <div className="space-y-8 max-h-[70vh] overflow-y-auto pr-2">
         {assessment.sections.map((section, sectionIndex) => (
           <Card key={section.id}>
             <CardHeader>

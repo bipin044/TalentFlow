@@ -175,8 +175,8 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ open, onOpenChan
                     <Building2 className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground">TechCorp Inc.</h3>
-                    <p className="text-sm text-muted-foreground">Technology • 500+ employees</p>
+                    <h3 className="font-semibold text-foreground">{job.company?.name || job.department}</h3>
+                    <p className="text-sm text-muted-foreground">{job.location}</p>
                   </div>
                 </div>
                 
@@ -185,11 +185,11 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ open, onOpenChan
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">www.techcorp.com</span>
+                    <span className="text-sm text-foreground">{job.contact?.website || '—'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">careers@techcorp.com</span>
+                    <span className="text-sm text-foreground">{job.contact?.email || '—'}</span>
                   </div>
                 </div>
               </div>

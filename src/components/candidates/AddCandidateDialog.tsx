@@ -28,6 +28,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { toast } from 'sonner';
+import { useCandidateStore } from '@/store/useCandidateStore';
 
 const candidateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -82,6 +83,8 @@ export const AddCandidateDialog: React.FC<AddCandidateDialogProps> = ({
   editingCandidate,
   onEditComplete,
 }) => {
+  const { addCandidate, updateCandidate } = useCandidateStore();
+  
   const form = useForm<CandidateFormData>({
     resolver: zodResolver(candidateSchema),
     defaultValues: {
@@ -137,17 +140,25 @@ export const AddCandidateDialog: React.FC<AddCandidateDialogProps> = ({
 
   const onSubmit = (data: CandidateFormData) => {
     try {
-      // In a real app, this would make an API call
-      console.log('Candidate data:', {
+      const candidateData = {
         ...data,
-        skills: data.skills.split(',').map(s => s.trim()),
+        skills: data.skills.split(',').map(s => s.trim()).filter(Boolean),
         notes: data.notes ? data.notes.split('\n').filter(n => n.trim()) : [],
         appliedDate: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         rating: Math.floor(Math.random() * 5) + 1,
-      });
+        avatar: undefined,
+        resume: undefined,
+      };
 
-      toast.success(`Candidate ${editingCandidate ? 'updated' : 'added'} successfully!`);
+      if (editingCandidate) {
+        updateCandidate(editingCandidate.id, candidateData);
+        toast.success('Candidate updated successfully!');
+      } else {
+        addCandidate(candidateData);
+        toast.success('Candidate added successfully!');
+      }
+
       form.reset();
       onOpenChange(false);
       onEditComplete?.();
@@ -286,9 +297,33 @@ export const AddCandidateDialog: React.FC<AddCandidateDialogProps> = ({
                       <Input 
                         type="number" 
                         min="0" 
+                        max="50"
+                        step="1"
                         placeholder="e.g. 5" 
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d+$/.test(value)) {
+                            field.onChange(value === '' ? 0 : parseInt(value));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow: backspace, delete, tab, escape, enter, decimal point
+                          if ([46, 8, 9, 27, 13, 110].indexOf(e.keyCode) !== -1 ||
+                              // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                              (e.keyCode === 65 && e.ctrlKey === true) ||
+                              (e.keyCode === 67 && e.ctrlKey === true) ||
+                              (e.keyCode === 86 && e.ctrlKey === true) ||
+                              (e.keyCode === 88 && e.ctrlKey === true) ||
+                              // Allow: home, end, left, right
+                              (e.keyCode >= 35 && e.keyCode <= 39)) {
+                            return;
+                          }
+                          // Ensure that it is a number and stop the keypress
+                          if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                            e.preventDefault();
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

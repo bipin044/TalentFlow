@@ -12,6 +12,9 @@ export interface Job {
   description: string;
   requirements: string[];
   tags: string[];
+  salary?: { min: number; max: number };
+  company?: { name?: string };
+  contact?: { email?: string; website?: string };
   createdAt: Date;
   updatedAt: Date;
   applicantCount: number;
@@ -23,7 +26,7 @@ interface JobStore {
   error: string | null;
   
   // Actions
-  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'updatedAt' | 'applicantCount'>) => void;
+  addJob: (job: Omit<Job, 'id' | 'updatedAt' | 'applicantCount'> & { createdAt?: Date }) => void;
   updateJob: (id: string, updates: Partial<Job>) => void;
   deleteJob: (id: string) => void;
   reorderJobs: (jobs: Job[]) => void;
@@ -42,7 +45,7 @@ export const useJobStore = create<JobStore>()(
         const newJob: Job = {
           ...jobData,
           id: crypto.randomUUID(),
-          createdAt: new Date(),
+          createdAt: jobData.createdAt ?? new Date(),
           updatedAt: new Date(),
           applicantCount: 0,
         };

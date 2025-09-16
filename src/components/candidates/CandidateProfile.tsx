@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -30,6 +30,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useCandidateStore, Candidate, StatusChange } from '@/store/useCandidateStore';
 import { NotesWithMentions } from './NotesWithMentions';
+import { AddCandidateDialog } from './AddCandidateDialog';
+import { useCandidateSeedData } from '@/hooks/useCandidateSeedData';
 
 export const CandidateProfile: React.FC = () => {
   const { candidateId } = useParams();
@@ -37,8 +39,30 @@ export const CandidateProfile: React.FC = () => {
   const { candidates, moveCandidateStage, addNote } = useCandidateStore();
   const [newNote, setNewNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // Initialize seed data to ensure candidates are loaded
+  const { candidates: seedCandidates } = useCandidateSeedData();
+  
+  // Ensure seed data is loaded when component mounts
+  useEffect(() => {
+    // The useCandidateSeedData hook will automatically populate the store
+  }, []);
   
   const candidate = candidates.find(c => c.id === candidateId);
+
+  // Show loading state while candidates are being loaded
+  if (candidates.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+          <User className="w-8 h-8 text-muted-foreground animate-spin" />
+        </div>
+        <h3 className="text-lg font-medium text-foreground mb-2">Loading candidate...</h3>
+        <p className="text-muted-foreground mb-4">Please wait while we load the candidate information.</p>
+      </div>
+    );
+  }
 
   if (!candidate) {
     return (
@@ -414,7 +438,11 @@ export const CandidateProfile: React.FC = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 Schedule Interview
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => setIsEditDialogOpen(true)}
+              >
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Profile
               </Button>
@@ -427,6 +455,14 @@ export const CandidateProfile: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <AddCandidateDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        editingCandidate={candidate}
+        onEditComplete={() => setIsEditDialogOpen(false)}
+      />
     </div>
   );
 };

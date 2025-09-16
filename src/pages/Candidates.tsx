@@ -223,7 +223,7 @@ export const Candidates: React.FC = () => {
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
 
   // If we're on a candidate profile page, show the profile component
-  if (candidateId && candidateId.startsWith('candidate-')) {
+  if (candidateId) {
     return <CandidateProfile />;
   }
 

@@ -16,8 +16,10 @@ import {
   CheckSquare, 
   Circle,
   Type,
-  AlignLeft
+  AlignLeft,
+  Settings
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AssessmentQuestion, QuestionType } from '@/types/assessment';
 import { ConditionalLogicBuilder } from './ConditionalLogic';
 
@@ -83,6 +85,43 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   onDelete,
   allQuestions = [],
 }) => {
+  const handleTypeChange = (newType: QuestionType) => {
+    const base: Partial<AssessmentQuestion> = { type: newType } as any;
+    // Reset type-specific fields when switching types
+    if (newType === 'single-choice' || newType === 'multi-choice') {
+      base.options = question.options && question.options.length > 0 ? question.options : [
+        { id: Math.random().toString(36).substr(2, 9), label: 'Option 1', value: 'option_1', order: 0 },
+        { id: Math.random().toString(36).substr(2, 9), label: 'Option 2', value: 'option_2', order: 1 },
+      ];
+      base.maxLength = undefined;
+      base.minValue = undefined;
+      base.maxValue = undefined;
+      base.fileTypes = undefined;
+      base.maxFileSize = undefined;
+    } else if (newType === 'short-text' || newType === 'long-text') {
+      base.maxLength = question.maxLength || undefined;
+      base.options = undefined;
+      base.minValue = undefined;
+      base.maxValue = undefined;
+      base.fileTypes = undefined;
+      base.maxFileSize = undefined;
+    } else if (newType === 'numeric-range') {
+      base.minValue = question.minValue || undefined;
+      base.maxValue = question.maxValue || undefined;
+      base.options = undefined;
+      base.maxLength = undefined;
+      base.fileTypes = undefined;
+      base.maxFileSize = undefined;
+    } else if (newType === 'file-upload') {
+      base.fileTypes = question.fileTypes || [];
+      base.maxFileSize = question.maxFileSize || 10;
+      base.options = undefined;
+      base.maxLength = undefined;
+      base.minValue = undefined;
+      base.maxValue = undefined;
+    }
+    onUpdate(base);
+  };
   const handleTitleChange = (title: string) => {
     onUpdate({ title });
   };
@@ -142,16 +181,25 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {questionTypeConfig && (
               <questionTypeConfig.icon className="w-4 h-4 text-muted-foreground" />
             )}
-            <CardTitle className="text-sm font-medium">
-              {questionTypeConfig?.label || question.type}
-            </CardTitle>
+            <div className="min-w-0 flex-1">
+              <Select value={question.type} onValueChange={(v) => handleTypeChange(v as QuestionType)}>
+                <SelectTrigger className="h-8 px-2 py-1 text-xs">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUESTION_TYPES.map((t) => (
+                    <SelectItem key={t.type} value={t.type}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {question.required && (
-              <Badge variant="destructive" className="text-xs">
+              <Badge variant="destructive" className="text-xs whitespace-nowrap">
                 Required
               </Badge>
             )}
@@ -174,6 +222,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
             id={`title-${question.id}`}
             value={question.title}
             onChange={(e) => handleTitleChange(e.target.value)}
+            autoFocus
             placeholder="Enter question title..."
           />
         </div>
@@ -195,7 +244,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
           <Checkbox
             id={`required-${question.id}`}
             checked={question.required}
-            onCheckedChange={handleRequiredChange}
+            onCheckedChange={(checked) => handleRequiredChange(!!checked)}
           />
           <Label htmlFor={`required-${question.id}`}>Required question</Label>
         </div>

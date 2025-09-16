@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Eye, 
@@ -118,6 +118,16 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
     addQuestion(assessment.id, sectionId, newQuestion);
   };
 
+  // Ensure at least the first question is selected so editor is visible
+  useEffect(() => {
+    if (!builderState.selectedQuestionId) {
+      const first = assessment.sections.flatMap(s => s.questions)[0];
+      if (first) {
+        setSelectedQuestion(first.id);
+      }
+    }
+  }, [assessment.sections, builderState.selectedQuestionId, setSelectedQuestion]);
+
   if (isPreviewMode) {
     return (
       <div className="h-full flex flex-col">
@@ -151,9 +161,9 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
   }
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex flex-col md:flex-row">
       {/* Left Sidebar - Assessment Structure */}
-      <div className="w-80 border-r bg-muted/20 flex flex-col">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-muted/20 flex flex-col md:sticky md:top-0 md:h-screen">
         <div className="p-4 border-b">
           <div className="space-y-4">
             <div className="space-y-2">
@@ -189,7 +199,7 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 max-h-[40vh] md:max-h-none">
             <div className="p-4 space-y-2">
               {assessment.sections.map((section, sectionIndex) => (
                 <Card key={section.id} className="border">
@@ -209,7 +219,7 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
                           )}
                         </Button>
                         <GripVertical className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <Input
                             value={section.title}
                             onChange={(e) => updateSection(assessment.id, section.id, { title: e.target.value })}
@@ -278,17 +288,18 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
 
                         <div className="space-y-2">
                           {section.questions.map((question, questionIndex) => (
-                            <div
+                            <button
                               key={question.id}
-                              className="flex items-center gap-2 p-2 border rounded-md bg-background hover:bg-muted/50 cursor-pointer"
-                              onClick={() => setSelectedQuestion(question.id)}
+                              type="button"
+                              className={`w-full text-left flex items-center gap-2 p-2 border rounded-md bg-background hover:bg-muted/50 ${builderState.selectedQuestionId === question.id ? 'ring-2 ring-primary' : ''}`}
+                              onClick={() => { setSelectedSection(section.id); setSelectedQuestion(question.id); }}
                             >
-                              <GripVertical className="w-4 h-4 text-muted-foreground" />
+                              <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">
-                                  {question.title}
+                                  {question.title || 'Untitled question'}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground truncate">
                                   {QUESTION_TYPES.find(t => t.type === question.type)?.label}
                                   {question.required && ' • Required'}
                                 </p>
@@ -299,7 +310,7 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
                                     <Settings className="w-3 h-3" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent>
+                                <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => duplicateQuestion(section.id, question)}>
                                     <Copy className="w-4 h-4 mr-2" />
                                     Duplicate
@@ -313,7 +324,7 @@ export const AssessmentBuilder: React.FC<AssessmentBuilderProps> = ({
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>

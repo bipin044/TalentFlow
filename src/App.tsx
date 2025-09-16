@@ -64,6 +64,7 @@ const AppContent = () => {
         <Route path="candidates/:candidateId" element={<Candidates />} />
         <Route path="candidates/profile/:candidateId" element={<Candidates />} />
         <Route path="assessments" element={<Assessments />} />
+        <Route path="assessments/:assessmentId/edit" element={<Assessments />} />
         <Route path="assessments/:assessmentId/preview" element={<Assessments />} />
         <Route path="assessments/:assessmentId/take" element={<AssessmentRuntimeRoute />} />
         <Route path="analytics" element={<Analytics />} />

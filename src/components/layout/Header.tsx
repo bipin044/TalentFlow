@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +62,7 @@ const mockNotifications = [
 
 export const Header: React.FC = () => {
   const { user, isAuthenticated, signOut } = useAuth();
+  const { profile } = useSettingsStore();
   const [notifications, setNotifications] = useState(mockNotifications);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -188,14 +190,14 @@ export const Header: React.FC = () => {
               <div className="flex items-center gap-3 ml-4 cursor-pointer hover:bg-muted/50 rounded-lg p-2 transition-colors">
                 <div className="text-right">
                   <p className="text-sm font-medium text-foreground">
-                    {user?.firstName} {user?.lastName}
+                    {profile.name}
                   </p>
                   <p className="text-xs text-muted-foreground">{user?.role}</p>
                 </div>
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={user?.avatar} />
+                  <AvatarImage src={profile.avatarUrl || user?.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    {profile.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </div>

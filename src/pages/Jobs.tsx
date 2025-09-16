@@ -12,6 +12,7 @@ import { useJobStore } from '@/store/useJobStore';
 import { Job } from '@/store/useJobStore';
 import { CreateJobDialog } from '@/components/jobs/CreateJobDialog';
 import { JobDetailModal } from '@/components/jobs/JobDetailModal';
+import { toast } from 'sonner';
 
 const JobCard: React.FC<{ 
   job: Job; 
@@ -21,6 +22,7 @@ const JobCard: React.FC<{
   onView: (job: Job) => void;
 }> = ({ job, onEdit, onArchive, onDelete, onView }) => {
   const navigate = useNavigate();
+  const isDraggingRef = React.useRef(false);
   
   const getStatusColor = (status: Job['status']) => {
     switch (status) {
@@ -32,17 +34,45 @@ const JobCard: React.FC<{
   };
 
   const handleCardClick = () => {
+    if (isDraggingRef.current) return;
     navigate(`/dashboard/jobs/${job.id}`);
+  };
+  
+  const handleCardKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleCardClick();
+    }
   };
 
   return (
-    <Card className="card-elevated hover:shadow-lg transition-all duration-300 cursor-pointer group">
+    <Card 
+      className="card-elevated hover:shadow-lg transition-all duration-300 cursor-pointer group"
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role="button"
+      tabIndex={0}
+      draggable
+      onDragStart={(e) => {
+        isDraggingRef.current = true;
+        e.dataTransfer.setData('jobId', job.id);
+        // Optional: reduce default drag image flicker
+        if (e.dataTransfer.setDragImage) {
+          const img = document.createElement('img');
+          img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIi8+';
+          e.dataTransfer.setDragImage(img, 0, 0);
+        }
+      }}
+      onDragEnd={() => {
+        // Delay to avoid click after drag
+        setTimeout(() => { isDraggingRef.current = false; }, 0);
+      }}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle 
               className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors"
-              onClick={handleCardClick}
             >
               {job.title}
             </CardTitle>
@@ -54,25 +84,30 @@ const JobCard: React.FC<{
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onView(job)}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(job); }}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onEdit(job)}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(job); }}>
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Job
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onArchive(job)}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onArchive(job); }}>
                   <Archive className="w-4 h-4 mr-2" />
                   {job.status === 'archived' ? 'Unarchive' : 'Archive'}
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDelete(job)}
+                  onClick={(e) => { e.stopPropagation(); onDelete(job); }}
                   className="text-destructive"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
@@ -124,7 +159,7 @@ const JobCard: React.FC<{
 };
 
 export const Jobs: React.FC = () => {
-  const { jobs, updateJob, deleteJob } = useJobStore();
+  const { jobs, updateJob, deleteJob, reorderJobs } = useJobStore() as any;
   const navigate = useNavigate();
   const { jobId } = useParams();
   
@@ -202,10 +237,14 @@ export const Jobs: React.FC = () => {
   };
 
   const handleArchiveJob = (job: Job) => {
-    updateJob(job.id, {
-      ...job,
-      status: job.status === 'archived' ? 'active' : 'archived'
-    });
+    const nextStatus = job.status === 'archived' ? 'active' : 'archived';
+    const previousStatus = job.status;
+    // Optimistic update
+    updateJob(job.id, { status: nextStatus });
+    toast.success(`${nextStatus === 'archived' ? 'Archived' : 'Unarchived'} "${job.title}"`);
+    // Example rollback hook if server fails (replace with real API call)
+    // fetch('/api/jobs/status', { method: 'POST', body: JSON.stringify({ id: job.id, status: nextStatus })})
+    //   .catch(() => { updateJob(job.id, { status: previousStatus }); toast.error('Failed to update. Rolled back.'); });
   };
 
   const handleDeleteJob = (job: Job) => {
@@ -215,8 +254,17 @@ export const Jobs: React.FC = () => {
   };
 
   const handleViewJob = (job: Job) => {
-    setSelectedJob(job);
-    setIsDetailModalOpen(true);
+    // Navigate to URL so deep links and back button work
+    navigate(`/dashboard/jobs/${job.id}`);
+  };
+
+  const handleDetailOpenChange = (open: boolean) => {
+    setIsDetailModalOpen(open);
+    if (!open) {
+      // Close modal: navigate back to jobs list
+      navigate('/dashboard/jobs');
+      setSelectedJob(null);
+    }
   };
 
   // Handle deep linking
@@ -227,8 +275,27 @@ export const Jobs: React.FC = () => {
         setSelectedJob(job);
         setIsDetailModalOpen(true);
       }
+    } else {
+      setIsDetailModalOpen(false);
+      setSelectedJob(null);
     }
   }, [jobId, jobs]);
+
+  // Reorder helpers (optimistic)
+  const performReorder = (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const currentOrder = [...jobs];
+    const fromIndex = currentOrder.findIndex(j => j.id === draggedId);
+    const toIndex = currentOrder.findIndex(j => j.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const prev = [...currentOrder];
+    const [moved] = currentOrder.splice(fromIndex, 1);
+    currentOrder.splice(toIndex, 0, moved);
+    reorderJobs(currentOrder);
+    // Example rollback if server fails
+    // fetch('/api/jobs/reorder', { method: 'POST', body: JSON.stringify(currentOrder)})
+    //   .catch(() => { reorderJobs(prev); toast.error('Failed to reorder. Rolled back.'); });
+  };
 
   return (
     <div className="space-y-6">
@@ -369,16 +436,27 @@ export const Jobs: React.FC = () => {
       </div>
 
       {/* Jobs Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {paginatedJobs.map((job) => (
-          <JobCard 
-            key={job.id} 
-            job={job}
-            onEdit={handleEditJob}
-            onArchive={handleArchiveJob}
-            onDelete={handleDeleteJob}
-            onView={handleViewJob}
-          />
+      <div 
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        onDragOver={(e) => e.preventDefault()}
+      >
+        {paginatedJobs.map((job, idx) => (
+          <div
+            key={job.id}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              const draggedId = e.dataTransfer.getData('jobId');
+              if (draggedId) performReorder(draggedId, job.id);
+            }}
+          >
+            <JobCard 
+              job={job}
+              onEdit={handleEditJob}
+              onArchive={handleArchiveJob}
+              onDelete={handleDeleteJob}
+              onView={handleViewJob}
+            />
+          </div>
         ))}
       </div>
 
@@ -449,7 +527,7 @@ export const Jobs: React.FC = () => {
       
       <JobDetailModal
         open={isDetailModalOpen}
-        onOpenChange={setIsDetailModalOpen}
+        onOpenChange={handleDetailOpenChange}
         job={selectedJob}
       />
     </div>

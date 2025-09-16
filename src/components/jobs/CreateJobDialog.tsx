@@ -41,6 +41,11 @@ const jobSchema = z.object({
   salaryRange: z.string().optional(),
   description: z.string().min(1, 'Job description is required'),
   status: z.enum(['active', 'draft', 'archived']),
+  createdDate: z.string().optional(),
+  requirementsText: z.string().optional(),
+  tagsText: z.string().optional(),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  website: z.string().url('Invalid URL').optional().or(z.literal('')),
 });
 
 type JobFormData = z.infer<typeof jobSchema>;
@@ -70,6 +75,11 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
       salaryRange: '',
       description: '',
       status: 'active',
+      createdDate: '',
+      requirementsText: '',
+      tagsText: '',
+      email: '',
+      website: '',
     },
   });
 
@@ -84,6 +94,11 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
         salaryRange: editingJob.salary ? `${editingJob.salary.min} - ${editingJob.salary.max}` : '',
         description: editingJob.description,
         status: editingJob.status,
+        createdDate: editingJob.createdAt ? new Date(editingJob.createdAt).toISOString().slice(0, 10) : '',
+        requirementsText: (editingJob.requirements || []).join('\n'),
+        tagsText: (editingJob.tags || []).join(', '),
+        email: editingJob.contact?.email || '',
+        website: editingJob.contact?.website || '',
       });
     } else {
       form.reset({
@@ -94,6 +109,11 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
         salaryRange: '',
         description: '',
         status: 'active',
+        createdDate: '',
+        requirementsText: '',
+        tagsText: '',
+        email: '',
+        website: '',
       });
     }
   }, [editingJob, form]);
@@ -105,6 +125,19 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
+
+      // Parse requirements and tags
+      const parsedRequirements = (data.requirementsText || '')
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const parsedTags = (data.tagsText || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      // Parse created date
+      const createdAt = data.createdDate ? new Date(data.createdDate) : undefined;
 
       if (editingJob) {
         // Update existing job
@@ -121,6 +154,11 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
             min: parseInt(data.salaryRange.split(' - ')[0].replace(/[^0-9]/g, '')),
             max: parseInt(data.salaryRange.split(' - ')[1]?.replace(/[^0-9]/g, '') || '0'),
           } : undefined,
+          requirements: parsedRequirements,
+          tags: parsedTags.length ? parsedTags : [data.type, data.location],
+          company: { name: data.companyName },
+          contact: { email: data.email || undefined, website: data.website || undefined },
+          createdAt: createdAt || editingJob.createdAt,
         });
         toast.success('Job updated successfully!');
         onEditComplete?.();
@@ -134,12 +172,15 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
           type: data.type,
           status: data.status,
           description: data.description,
-          requirements: [],
-          tags: [data.type, data.location],
+          requirements: parsedRequirements,
+          tags: parsedTags.length ? parsedTags : [data.type, data.location],
           salary: data.salaryRange ? {
             min: parseInt(data.salaryRange.split(' - ')[0].replace(/[^0-9]/g, '')),
             max: parseInt(data.salaryRange.split(' - ')[1]?.replace(/[^0-9]/g, '') || '0'),
           } : undefined,
+          company: { name: data.companyName },
+          contact: { email: data.email || undefined, website: data.website || undefined },
+          createdAt,
         });
         toast.success('Job created successfully!');
       }
@@ -277,6 +318,52 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="createdDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" placeholder="Select date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. careers@company.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Website</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. https://company.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
               name="description"
@@ -294,6 +381,44 @@ export const CreateJobDialog: React.FC<CreateJobDialogProps> = ({
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="requirementsText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Requirements (one per line)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={"Requirement 1\nRequirement 2"}
+                        className="min-h-[120px] resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tagsText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Skills & Tags (comma separated)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="react, typescript, frontend"
+                        className="min-h-[120px] resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
               <Button

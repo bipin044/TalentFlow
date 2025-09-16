@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ClipboardList, 
   Search, 
@@ -32,6 +32,7 @@ import { CreateAssessmentDialog } from '@/components/assessments/CreateAssessmen
 
 export const Assessments: React.FC = () => {
   const navigate = useNavigate();
+  const { assessmentId } = useParams();
   const { 
     assessments, 
     currentAssessment, 
@@ -100,10 +101,16 @@ export const Assessments: React.FC = () => {
     return getResponsesForAssessment(assessmentId).length;
   };
 
-  // If we're in builder mode, show the builder
+  // If we're in builder mode, show the builder with a back button
   if (currentAssessment) {
     return (
-      <AssessmentBuilder
+      <div className="h-full flex flex-col">
+        <div className="p-3 border-b">
+          <Button variant="outline" size="sm" onClick={() => setCurrentAssessment(null)}>
+            Back to Assessments
+          </Button>
+        </div>
+        <AssessmentBuilder
         assessment={currentAssessment}
         onSave={() => {
           // Assessment is auto-saved via the store
@@ -113,7 +120,8 @@ export const Assessments: React.FC = () => {
           publishAssessment(currentAssessment.id);
           setCurrentAssessment(null);
         }}
-      />
+        />
+      </div>
     );
   }
 

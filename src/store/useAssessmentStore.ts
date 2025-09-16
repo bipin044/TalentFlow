@@ -492,6 +492,7 @@ export const useAssessmentStore = create<AssessmentStore>()(
       partialize: (state) => ({
         assessments: state.assessments,
         responses: state.responses,
+        builderState: state.builderState,
       }),
     }
   )

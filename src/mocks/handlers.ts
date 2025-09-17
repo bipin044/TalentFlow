@@ -6,39 +6,40 @@ import { createSampleAssessments } from '@/utils/assessmentSeedData';
 import { Job } from '@/store/useJobStore';
 import { Candidate } from '@/store/useCandidateStore';
 import { Assessment } from '@/types/assessment';
+import { idbBulkPut, idbGetAll, idbGetKV, idbPut, idbSetKV } from '@/lib/idb';
 
-// Simple in-memory DB
-const jobs: Job[] = [];
-const candidates: Candidate[] = [];
-const assessments: Assessment[] = [] as any;
-
-// Seed data as per spec
-(() => {
+// Seed data into IndexedDB once
+async function ensureSeeded() {
+  const seeded = await idbGetKV<boolean>('seeded');
+  if (seeded) return;
   const now = new Date();
-  generateSeedJobs().slice(0, 25).forEach((j, idx) => {
-    const job: Job = {
-      title: j.title,
-      slug: j.slug,
-      department: j.department,
-      location: j.location,
-      type: j.type,
-      status: j.status,
-      description: j.description,
-      requirements: j.requirements,
-      tags: j.tags,
-      salary: j.salary,
-      company: j.company,
-      contact: j.contact,
-      id: crypto.randomUUID(),
-      createdAt: new Date(now.getTime() - idx * 86400000),
-      updatedAt: new Date(now.getTime() - idx * 3600000),
-      applicantCount: Math.floor(Math.random() * 50),
-    };
-    jobs.push(job);
-  });
-  generateSeedCandidates(1000).forEach(c => candidates.push(c));
-  createSampleAssessments().forEach(a => assessments.push({ ...a } as any));
-})();
+  const seedJobs: Job[] = generateSeedJobs().slice(0, 25).map((j, idx) => ({
+    title: j.title,
+    slug: j.slug,
+    department: j.department,
+    location: j.location,
+    type: j.type,
+    status: j.status,
+    description: j.description,
+    requirements: j.requirements,
+    tags: j.tags,
+    salary: j.salary,
+    company: j.company,
+    contact: j.contact,
+    id: crypto.randomUUID(),
+    createdAt: new Date(now.getTime() - idx * 86400000),
+    updatedAt: new Date(now.getTime() - idx * 3600000),
+    applicantCount: Math.floor(Math.random() * 50),
+  }));
+  const seedCandidates: Candidate[] = generateSeedCandidates(1000);
+  const seedAssessments: Assessment[] = createSampleAssessments().map(a => ({ ...a } as any));
+  await Promise.all([
+    idbBulkPut('jobs', seedJobs as any),
+    idbBulkPut('candidates', seedCandidates as any),
+    idbBulkPut('assessments', seedAssessments as any),
+  ]);
+  await idbSetKV('seeded', true);
+}
 
 // Utilities
 const withLatencyAndErrors = async (fn: () => any, isWrite = false) => {
@@ -51,7 +52,9 @@ const withLatencyAndErrors = async (fn: () => any, isWrite = false) => {
 
 export const handlers = [
   // Jobs
-  http.get('/jobs', async ({ request }) => withLatencyAndErrors(() => {
+  http.get('/jobs', async ({ request }) => withLatencyAndErrors(async () => {
+    await ensureSeeded();
+    const all = await idbGetAll<Job>('jobs');
     const url = new URL(request.url);
     const search = url.searchParams.get('search')?.toLowerCase() || '';
     const status = url.searchParams.get('status');
@@ -59,7 +62,7 @@ export const handlers = [
     const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
     const sort = url.searchParams.get('sort') || 'createdAt:desc';
 
-    let filtered = jobs.filter(j =>
+    let filtered = all.filter(j =>
       (!status || j.status === status) &&
       (!search || j.title.toLowerCase().includes(search) || j.slug.toLowerCase().includes(search))
     );
@@ -96,17 +99,19 @@ export const handlers = [
       updatedAt: new Date(),
       applicantCount: 0,
     };
-    jobs.unshift(job);
+    await idbPut('jobs', job as any);
     return HttpResponse.json(job, { status: 201 });
   }, true)),
 
   http.patch('/jobs/:id', async ({ params, request }) => withLatencyAndErrors(async () => {
     const { id } = params as { id: string };
     const updates = await request.json() as Partial<Job> & Record<string, any>;
-    const idx = jobs.findIndex(j => j.id === id);
-    if (idx === -1) return HttpResponse.json({ message: 'Not found' }, { status: 404 });
-    jobs[idx] = { ...jobs[idx], ...updates, updatedAt: new Date() };
-    return HttpResponse.json(jobs[idx]);
+    const all = await idbGetAll<Job>('jobs');
+    const current = all.find(j => j.id === id);
+    if (!current) return HttpResponse.json({ message: 'Not found' }, { status: 404 });
+    const next = { ...current, ...updates, updatedAt: new Date() } as Job;
+    await idbPut('jobs', next as any);
+    return HttpResponse.json(next);
   }, true)),
 
   http.patch('/jobs/:id/reorder', async ({ request }) => withLatencyAndErrors(async () => {
@@ -114,22 +119,24 @@ export const handlers = [
     if (fromOrder === undefined || toOrder === undefined) {
       return HttpResponse.json({ message: 'Invalid order' }, { status: 400 });
     }
-    const newJobs = Array.from(jobs);
+    const newJobs = await idbGetAll<Job>('jobs');
     const [dragged] = newJobs.splice(fromOrder, 1);
     newJobs.splice(toOrder, 0, dragged);
     newJobs.forEach((j, idx) => (j as any).order = idx);
-    jobs.splice(0, jobs.length, ...newJobs);
+    await idbBulkPut('jobs', newJobs as any);
     return HttpResponse.json({ success: true });
   }, true)),
 
   // Candidates
-  http.get('/candidates', async ({ request }) => withLatencyAndErrors(() => {
+  http.get('/candidates', async ({ request }) => withLatencyAndErrors(async () => {
+    await ensureSeeded();
+    const all = await idbGetAll<Candidate>('candidates');
     const url = new URL(request.url);
     const search = (url.searchParams.get('search') || '').toLowerCase();
     const stage = url.searchParams.get('stage');
     const page = parseInt(url.searchParams.get('page') || '1', 10);
     const pageSize = 25;
-    let filtered = candidates.filter(c =>
+    let filtered = all.filter(c =>
       (!stage || c.stage === stage) &&
       (!search || c.name.toLowerCase().includes(search) || c.email.toLowerCase().includes(search))
     );
@@ -160,22 +167,25 @@ export const handlers = [
       portfolio: body.portfolio,
       statusHistory: body.statusHistory ?? [],
     };
-    candidates.unshift(newCandidate);
+    await idbPut('candidates', newCandidate as any);
     return HttpResponse.json(newCandidate, { status: 201 });
   }, true)),
 
   http.patch('/candidates/:id', async ({ params, request }) => withLatencyAndErrors(async () => {
     const { id } = params as { id: string };
     const updates = await request.json() as Partial<Candidate> & Record<string, any>;
-    const idx = candidates.findIndex(c => c.id === id);
-    if (idx === -1) return HttpResponse.json({ message: 'Not found' }, { status: 404 });
-    candidates[idx] = { ...candidates[idx], ...updates } as Candidate;
-    return HttpResponse.json(candidates[idx]);
+    const all = await idbGetAll<Candidate>('candidates');
+    const current = all.find(c => c.id === id);
+    if (!current) return HttpResponse.json({ message: 'Not found' }, { status: 404 });
+    const next = { ...current, ...updates } as Candidate;
+    await idbPut('candidates', next as any);
+    return HttpResponse.json(next);
   }, true)),
 
-  http.get('/candidates/:id/timeline', async ({ params }) => withLatencyAndErrors(() => {
+  http.get('/candidates/:id/timeline', async ({ params }) => withLatencyAndErrors(async () => {
     const { id } = params as { id: string };
-    const candidate = candidates.find(c => c.id === id);
+    const all = await idbGetAll<Candidate>('candidates');
+    const candidate = all.find(c => c.id === id);
     if (!candidate) return HttpResponse.json({ message: 'Not found' }, { status: 404 });
     const timeline = [
       { id: 't1', type: 'applied', date: new Date(), description: 'Candidate applied' },
@@ -185,26 +195,28 @@ export const handlers = [
   })),
 
   // Assessments
-  http.get('/assessments/:jobId', async ({ params }) => withLatencyAndErrors(() => {
+  http.get('/assessments/:jobId', async ({ params }) => withLatencyAndErrors(async () => {
     const { jobId } = params as { jobId: string };
-    const list = assessments.filter(a => (a as any).jobId === jobId || !(a as any).jobId);
+    await ensureSeeded();
+    const all = await idbGetAll<Assessment>('assessments');
+    const list = all.filter(a => (a as any).jobId === jobId || !(a as any).jobId);
     return HttpResponse.json(list);
   })),
 
   http.put('/assessments/:jobId', async ({ params, request }) => withLatencyAndErrors(async () => {
     const { jobId } = params as { jobId: string };
     const body = await request.json();
-    const filtered = assessments.filter(a => (a as any).jobId !== jobId);
-    const next = body as Assessment[];
-    next.forEach(a => (a as any).jobId = jobId);
-    assessments.splice(0, assessments.length, ...filtered, ...next);
+    const all = await idbGetAll<Assessment>('assessments');
+    const remaining = all.filter(a => (a as any).jobId !== jobId);
+    const next = (body as Assessment[]).map(a => ({ ...a, jobId } as any));
+    await idbBulkPut('assessments', [...remaining, ...next] as any);
     return HttpResponse.json({ success: true });
   }, true)),
 
   http.post('/assessments/:jobId/submit', async ({ params, request }) => withLatencyAndErrors(async () => {
     const { jobId } = params as { jobId: string };
     const submission = await request.json();
-    localStorage.setItem(`assessment_submission_${jobId}`, JSON.stringify(submission));
+    await idbSetKV(`assessment_submission_${jobId}`, submission);
     return HttpResponse.json({ success: true });
   }, true)),
 ];

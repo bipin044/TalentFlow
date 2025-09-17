@@ -32,27 +32,40 @@ import { useCandidateStore, Candidate, StatusChange } from '@/store/useCandidate
 import { NotesWithMentions } from './NotesWithMentions';
 import { AddCandidateDialog } from './AddCandidateDialog';
 import { useCandidateSeedData } from '@/hooks/useCandidateSeedData';
+import { idbGetById } from '@/lib/idb';
 
 export const CandidateProfile: React.FC = () => {
   const { candidateId } = useParams();
   const navigate = useNavigate();
-  const { candidates, moveCandidateStage, addNote } = useCandidateStore();
+  const { candidates, setCandidates, moveCandidateStage, addNote } = useCandidateStore();
   const [newNote, setNewNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
   
   // Initialize seed data to ensure candidates are loaded
   const { candidates: seedCandidates } = useCandidateSeedData();
   
-  // Ensure seed data is loaded when component mounts
+  // If the candidate isn't yet in the store (e.g., initial deep link), hydrate from IndexedDB
   useEffect(() => {
-    // The useCandidateSeedData hook will automatically populate the store
-  }, []);
+    let mounted = true;
+    (async () => {
+      if (!candidateId) return;
+      if (candidates.find(c => c.id === candidateId)) return;
+      setIsHydrating(true);
+      const existing = await idbGetById<Candidate>('candidates', candidateId);
+      if (mounted && existing) {
+        setCandidates([existing, ...candidates.filter(c => c.id !== existing.id)]);
+      }
+      if (mounted) setIsHydrating(false);
+    })();
+    return () => { mounted = false; };
+  }, [candidateId, candidates, setCandidates]);
   
   const candidate = candidates.find(c => c.id === candidateId);
 
   // Show loading state while candidates are being loaded
-  if (candidates.length === 0) {
+  if (candidates.length === 0 || isHydrating) {
     return (
       <div className="text-center py-12">
         <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">

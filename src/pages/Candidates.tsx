@@ -203,6 +203,7 @@ const KanbanColumn: React.FC<{
 export const Candidates: React.FC = () => {
   const navigate = useNavigate();
   const { candidateId } = useParams();
+  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   
   const { 
     moveCandidateStage, 
@@ -215,7 +216,7 @@ export const Candidates: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<'all' | Candidate['stage']>('all');
-  const [positionFilter, setPositionFilter] = useState<string>('all');
+  const [positionFilter, setPositionFilter] = useState<string>(urlParams.get('position') || 'all');
   const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'virtualized'>('kanban');
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

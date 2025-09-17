@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { idbJsonStorage } from '@/lib/zustandStorage';
 import { 
   Assessment, 
   AssessmentSection, 
@@ -489,6 +490,7 @@ export const useAssessmentStore = create<AssessmentStore>()(
     }),
     {
       name: 'assessment-store',
+      storage: idbJsonStorage('zustand'),
       partialize: (state) => ({
         assessments: state.assessments,
         responses: state.responses,

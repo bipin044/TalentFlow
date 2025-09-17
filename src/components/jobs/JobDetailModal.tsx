@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ interface JobDetailModalProps {
 
 export const JobDetailModal: React.FC<JobDetailModalProps> = ({ open, onOpenChange, job }) => {
   if (!job) return null;
+  const navigate = useNavigate();
 
   const getStatusColor = (status: Job['status']) => {
     switch (status) {
@@ -199,21 +201,39 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ open, onOpenChan
           {/* Actions */}
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  const shareUrl = `${window.location.origin}/jobs/${job.id}`;
+                  const shareData = { title: job.title, text: job.title, url: shareUrl } as any;
+                  try {
+                    if ((navigator as any).share) {
+                      await (navigator as any).share(shareData);
+                    } else if (navigator.clipboard) {
+                      await navigator.clipboard.writeText(shareUrl);
+                      alert('Link copied to clipboard');
+                    } else {
+                      // Fallback: open a prompt
+                      window.prompt('Copy link', shareUrl);
+                    }
+                  } catch (e) {
+                    console.error('Share failed', e);
+                  }
+                }}
+              >
                 <Share2 className="w-4 h-4 mr-2" />
                 Share Job
               </Button>
-              <Button variant="outline" size="sm">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View Public Posting
-              </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline">
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Job
-              </Button>
-              <Button className="gradient-primary text-white">
+              <Button 
+                className="gradient-primary text-white"
+                onClick={() => {
+                  const params = new URLSearchParams({ position: job.title });
+                  navigate(`/dashboard/candidates?${params.toString()}`);
+                }}
+              >
                 View Applications
               </Button>
             </div>

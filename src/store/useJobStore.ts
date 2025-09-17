@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { idbJsonStorage } from '@/lib/zustandStorage';
 
 export interface Job {
   id: string;
@@ -75,6 +76,7 @@ export const useJobStore = create<JobStore>()(
     }),
     {
       name: 'talentflow-jobs',
+      storage: idbJsonStorage('zustand'),
     }
   )
 );
